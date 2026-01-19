@@ -289,19 +289,27 @@ public:
 };
 
 /**
+ * @brief Typedef declarator with optional array dimensions
+ */
+struct TypedefDeclarator {
+    std::string name;
+    std::vector<size_t> arrayDimensions;  // Empty for non-array typedefs
+};
+
+/**
  * @brief Typedef definition
  */
 class TypedefNode : public DefinitionNode {
 public:
     ASTPtr<TypeNode> originalType;
-    std::vector<std::string> declarators;  // Can have multiple: typedef long X, Y;
+    std::vector<TypedefDeclarator> declarators;  // Can have multiple: typedef long X, Y[10];
 
-    TypedefNode(ASTPtr<TypeNode> origType, std::vector<std::string> names,
+    TypedefNode(ASTPtr<TypeNode> origType, std::vector<TypedefDeclarator> decls,
                 SourceLocation loc = {})
         : DefinitionNode(std::move(loc)), originalType(std::move(origType)),
-          declarators(std::move(names)) {
+          declarators(std::move(decls)) {
         if (!declarators.empty()) {
-            name = declarators[0];
+            name = declarators[0].name;
         }
     }
 

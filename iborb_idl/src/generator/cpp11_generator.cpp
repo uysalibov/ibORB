@@ -533,8 +533,18 @@ void Cpp11Generator::generateEnum(EnumNode& node) {
 void Cpp11Generator::generateTypedef(TypedefNode& node) {
     std::string baseType = mapType(node.originalType.get());
 
-    for (const auto& name : node.declarators) {
-        writeHeaderLine("using " + name + " = " + baseType + ";");
+    for (const auto& decl : node.declarators) {
+        std::string finalType = baseType;
+        
+        // Handle array dimensions: typedef octet UUID[16] -> std::array<uint8_t, 16>
+        if (!decl.arrayDimensions.empty()) {
+            // Build nested std::array from innermost to outermost
+            for (auto it = decl.arrayDimensions.rbegin(); it != decl.arrayDimensions.rend(); ++it) {
+                finalType = "std::array<" + finalType + ", " + std::to_string(*it) + ">";
+            }
+        }
+        
+        writeHeaderLine("using " + decl.name + " = " + finalType + ";");
     }
     writeHeaderLine();
 }

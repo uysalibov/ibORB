@@ -498,13 +498,16 @@ ASTPtr<TypedefNode> Parser::parseTypedef() {
 
     expectSemicolon();
 
-    std::vector<std::string> names;
+    std::vector<ast::TypedefDeclarator> astDeclarators;
     for (const auto& decl : declarators) {
-        names.push_back(decl.name);
+        ast::TypedefDeclarator astDecl;
+        astDecl.name = decl.name;
+        astDecl.arrayDimensions = decl.arrayDimensions;
+        astDeclarators.push_back(std::move(astDecl));
         symbolTable_.addSymbol(decl.name, SymbolKind::Typedef);
     }
 
-    auto node = std::make_unique<TypedefNode>(std::move(type), std::move(names), loc);
+    auto node = std::make_unique<TypedefNode>(std::move(type), std::move(astDeclarators), loc);
     node->fullyQualifiedName = symbolTable_.buildFullyQualifiedName(node->name);
     return node;
 }
