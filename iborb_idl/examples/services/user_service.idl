@@ -5,8 +5,8 @@
 #ifndef USER_SERVICE_IDL
 #define USER_SERVICE_IDL
 
-#include "../common/types.idl"
-#include "../common/collections.idl"
+#include "common/types.idl"
+#include "common/collections.idl"
 
 module Services {
 module User {

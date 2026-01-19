@@ -5,7 +5,7 @@
 #ifndef GEOMETRY_SHAPES_IDL
 #define GEOMETRY_SHAPES_IDL
 
-#include "../common/types.idl"
+#include "common/types.idl"
 
 module Geometry {
 

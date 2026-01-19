@@ -5,7 +5,7 @@
 #ifndef COMMON_COLLECTIONS_IDL
 #define COMMON_COLLECTIONS_IDL
 
-#include "types.idl"
+#include "common/types.idl"
 
 module Common {
 module Collections {
