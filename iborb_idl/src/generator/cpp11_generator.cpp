@@ -354,6 +354,10 @@ void Cpp11Generator::generateStruct(StructNode& node) {
     if (config_.addDoxygen) {
         writeHeaderLine("/**");
         writeHeaderLine(" * @brief IDL struct " + node.name);
+        std::string srcLoc = formatSourceLocation(node.location);
+        if (!srcLoc.empty()) {
+            writeHeaderLine(" * @idlsource " + srcLoc);
+        }
         writeHeaderLine(" */");
     }
     
@@ -401,6 +405,10 @@ void Cpp11Generator::generateInterface(InterfaceNode& node) {
         writeHeaderLine(" * @brief IDL interface " + node.name);
         if (node.isAbstract) {
             writeHeaderLine(" * @note This is an abstract interface");
+        }
+        std::string srcLoc = formatSourceLocation(node.location);
+        if (!srcLoc.empty()) {
+            writeHeaderLine(" * @idlsource " + srcLoc);
         }
         writeHeaderLine(" */");
     }
@@ -511,6 +519,10 @@ void Cpp11Generator::generateEnum(EnumNode& node) {
     if (config_.addDoxygen) {
         writeHeaderLine("/**");
         writeHeaderLine(" * @brief IDL enum " + node.name);
+        std::string srcLoc = formatSourceLocation(node.location);
+        if (!srcLoc.empty()) {
+            writeHeaderLine(" * @idlsource " + srcLoc);
+        }
         writeHeaderLine(" */");
     }
     
@@ -544,6 +556,10 @@ void Cpp11Generator::generateTypedef(TypedefNode& node) {
             }
         }
         
+        if (config_.addDoxygen) {
+            writeHeaderLine("/** @brief IDL typedef " + decl.name + " @idlsource " + 
+                           formatSourceLocation(node.location) + " */");
+        }
         writeHeaderLine("using " + decl.name + " = " + finalType + ";");
     }
     writeHeaderLine();
@@ -553,6 +569,10 @@ void Cpp11Generator::generateConst(ConstNode& node) {
     std::string type = mapType(node.type.get());
     std::string value = constValueToString(node.value);
 
+    if (config_.addDoxygen) {
+        writeHeaderLine("/** @brief IDL const " + node.name + " @idlsource " + 
+                       formatSourceLocation(node.location) + " */");
+    }
     writeHeaderLine("constexpr " + type + " " + node.name + " = " + value + ";");
     writeHeaderLine();
 }
@@ -561,6 +581,10 @@ void Cpp11Generator::generateException(ExceptionNode& node) {
     if (config_.addDoxygen) {
         writeHeaderLine("/**");
         writeHeaderLine(" * @brief IDL exception " + node.name);
+        std::string srcLoc = formatSourceLocation(node.location);
+        if (!srcLoc.empty()) {
+            writeHeaderLine(" * @idlsource " + srcLoc);
+        }
         writeHeaderLine(" */");
     }
     
@@ -616,6 +640,10 @@ void Cpp11Generator::generateUnion(UnionNode& node) {
     if (config_.addDoxygen) {
         writeHeaderLine("/**");
         writeHeaderLine(" * @brief IDL union " + node.name);
+        std::string srcLoc = formatSourceLocation(node.location);
+        if (!srcLoc.empty()) {
+            writeHeaderLine(" * @idlsource " + srcLoc);
+        }
         writeHeaderLine(" */");
     }
 
@@ -745,6 +773,13 @@ std::string Cpp11Generator::makeIncludeGuard(const std::string& filename) const 
     
     guard += "_HPP";
     return guard;
+}
+
+std::string Cpp11Generator::formatSourceLocation(const SourceLocation& loc) const {
+    if (loc.filename.empty()) {
+        return "";
+    }
+    return loc.filename + ":" + std::to_string(loc.line);
 }
 
 void Cpp11Generator::addError(const std::string& message) {

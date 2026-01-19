@@ -135,6 +135,7 @@ private:
     std::string sanitizeIdentifier(const std::string& name) const;
     std::string constValueToString(const ast::ConstValue& value) const;
     std::string makeIncludeGuard(const std::string& filename) const;
+    std::string formatSourceLocation(const ast::SourceLocation& loc) const;
     void addError(const std::string& message);
 };
 
