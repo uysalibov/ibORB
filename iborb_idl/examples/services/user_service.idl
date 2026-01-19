@@ -1,0 +1,356 @@
+/**
+ * User management service with complex nested types
+ */
+
+#ifndef USER_SERVICE_IDL
+#define USER_SERVICE_IDL
+
+#include "../common/types.idl"
+#include "../common/collections.idl"
+
+module Services {
+module User {
+
+    // Type aliases from Common
+    typedef Common::ObjectId UserId;
+    typedef Common::ObjectId RoleId;
+    typedef Common::ObjectId GroupId;
+    typedef Common::DateTime DateTime;
+    typedef Common::Properties Metadata;
+    typedef Common::UUID UUID;
+
+    // User status
+    enum UserStatus {
+        ACTIVE,
+        INACTIVE,
+        SUSPENDED,
+        PENDING_VERIFICATION,
+        DELETED
+    };
+
+    // Authentication method
+    enum AuthMethod {
+        PASSWORD,
+        OAUTH2,
+        SAML,
+        LDAP,
+        CERTIFICATE,
+        TWO_FACTOR
+    };
+
+    // Permission level
+    enum PermissionLevel {
+        NONE,
+        READ,
+        WRITE,
+        ADMIN,
+        SUPER_ADMIN
+    };
+
+    // Address (nested struct)
+    struct Address {
+        string street;
+        string city;
+        string state;
+        string postalCode;
+        string country;
+        Common::Point2D coordinates;  // Geolocation
+    };
+
+    typedef sequence<Address> AddressList;
+
+    // Contact information
+    struct ContactInfo {
+        string email;
+        string phone;
+        string mobile;
+        AddressList addresses;  // Multiple addresses
+        Metadata socialLinks;   // Social media links as key-value
+    };
+
+    // Role definition
+    struct Role {
+        RoleId id;
+        string name;
+        string description;
+        sequence<string> permissions;  // Permission strings
+        PermissionLevel level;
+        boolean isSystemRole;
+    };
+
+    typedef sequence<Role> RoleList;
+    typedef sequence<RoleId> RoleIdList;
+
+    // Permission assignment
+    struct PermissionAssignment {
+        string resource;
+        PermissionLevel level;
+        DateTime grantedAt;
+        UserId grantedBy;
+        DateTime expiresAt;  // Optional expiration
+    };
+
+    typedef sequence<PermissionAssignment> PermissionList;
+
+    // Group definition
+    struct Group {
+        GroupId id;
+        string name;
+        string description;
+        GroupId parentId;  // For hierarchical groups
+        sequence<UserId> memberIds;
+        RoleIdList defaultRoles;
+        Metadata settings;
+    };
+
+    typedef sequence<Group> GroupList;
+    typedef sequence<GroupId> GroupIdList;
+    
+    // Nested group hierarchy
+    typedef sequence<GroupList> GroupHierarchy;  // Groups at each level
+
+    // Authentication credentials
+    struct Credentials {
+        AuthMethod method;
+        string identifier;  // Username, email, etc.
+        string secret;      // Password hash, token, etc.
+        DateTime lastUsed;
+        boolean isExpired;
+    };
+
+    typedef sequence<Credentials> CredentialsList;
+
+    // Session information
+    struct Session {
+        UUID sessionId;
+        UserId userId;
+        DateTime createdAt;
+        DateTime lastActivity;
+        DateTime expiresAt;
+        string ipAddress;
+        string userAgent;
+        Metadata _context;
+    };
+
+    typedef sequence<Session> SessionList;
+
+    // User profile
+    struct UserProfile {
+        UserId id;
+        string username;
+        string displayName;
+        string firstName;
+        string lastName;
+        ContactInfo contact;
+        UserStatus status;
+        DateTime createdAt;
+        DateTime updatedAt;
+        DateTime lastLoginAt;
+        Common::BinaryData avatar;  // Profile picture
+        string locale;
+        string timezone;
+        Metadata preferences;
+    };
+
+    // Complete user with all relations
+    struct User {
+        UserProfile profile;
+        CredentialsList credentials;
+        RoleList roles;
+        GroupIdList groupMemberships;
+        PermissionList directPermissions;
+        SessionList activeSessions;
+        Metadata customAttributes;
+    };
+
+    typedef sequence<User> UserList;
+    typedef sequence<UserProfile> UserProfileList;
+
+    // Deeply nested: Users grouped by role, then by status
+    typedef sequence<UserList> UsersByRole;
+    typedef sequence<UsersByRole> UsersByRoleAndStatus;
+
+    // Audit log entry
+    struct AuditLogEntry {
+        Common::ObjectId id;
+        UserId userId;
+        string action;
+        string resource;
+        Metadata details;
+        DateTime timestamp;
+        string ipAddress;
+        Common::Result result;
+    };
+
+    typedef sequence<AuditLogEntry> AuditLog;
+
+    // Search/filter criteria
+    struct UserSearchCriteria {
+        string query;
+        sequence<UserStatus> statuses;
+        RoleIdList roles;
+        GroupIdList groups;
+        DateTime createdAfter;
+        DateTime createdBefore;
+        unsigned long limit;
+        unsigned long offset;
+        string sortBy;
+        boolean sortDescending;
+    };
+
+    // Search results
+    struct UserSearchResults {
+        UserProfileList users;
+        Common::Collections::PageInfo pagination;
+        unsigned long totalMatches;
+    };
+
+    // Exceptions
+    exception UserNotFoundException {
+        Common::ErrorCode code;
+        string message;
+        UserId userId;
+    };
+
+    exception AuthenticationException {
+        Common::ErrorCode code;
+        string message;
+        AuthMethod attemptedMethod;
+        unsigned short failedAttempts;
+    };
+
+    exception AuthorizationException {
+        Common::ErrorCode code;
+        string message;
+        UserId userId;
+        string resource;
+        PermissionLevel required;
+        PermissionLevel actual;
+    };
+
+    exception DuplicateUserException {
+        Common::ErrorCode code;
+        string message;
+        string field;
+        string value;
+    };
+
+    // User management interface
+    interface UserManager {
+        // CRUD operations
+        User createUser(in UserProfile profile, in Credentials initialCredentials)
+            raises (DuplicateUserException);
+        
+        User getUser(in UserId id)
+            raises (UserNotFoundException);
+        
+        UserProfile getUserProfile(in UserId id)
+            raises (UserNotFoundException);
+        
+        void updateUser(in UserId id, in UserProfile profile)
+            raises (UserNotFoundException, AuthorizationException);
+        
+        void deleteUser(in UserId id)
+            raises (UserNotFoundException, AuthorizationException);
+
+        // Batch operations
+        UserList getUsers(in sequence<UserId> ids);
+        UserProfileList getUserProfiles(in sequence<UserId> ids);
+        
+        // Search
+        UserSearchResults searchUsers(in UserSearchCriteria criteria);
+        UserProfileList findByEmail(in string email);
+        UserProfileList findByRole(in RoleId roleId);
+        UserProfileList findByGroup(in GroupId groupId);
+
+        // Status management
+        void setUserStatus(in UserId id, in UserStatus status)
+            raises (UserNotFoundException, AuthorizationException);
+        
+        // Attributes
+        readonly attribute unsigned long totalUsers;
+        readonly attribute unsigned long activeUsers;
+    };
+
+    // Authentication interface
+    interface AuthService {
+        Session login(in string identifier, in string secret)
+            raises (AuthenticationException);
+        
+        Session loginWithToken(in string token)
+            raises (AuthenticationException);
+        
+        void logout(in UUID sessionId);
+        void logoutAll(in UserId userId);
+        
+        Session refreshSession(in UUID sessionId)
+            raises (AuthenticationException);
+        
+        boolean validateSession(in UUID sessionId);
+        Session getSession(in UUID sessionId);
+        SessionList getActiveSessions(in UserId userId);
+
+        // Password management
+        void changePassword(in UserId userId, in string oldPassword, in string newPassword)
+            raises (AuthenticationException);
+        
+        void resetPassword(in UserId userId)
+            raises (UserNotFoundException);
+        
+        boolean validatePassword(in UserId userId, in string password);
+
+        // Two-factor auth
+        string setupTwoFactor(in UserId userId);
+        boolean verifyTwoFactorCode(in UserId userId, in string code);
+        void disableTwoFactor(in UserId userId);
+    };
+
+    // Role & Permission interface
+    interface RoleManager {
+        // Role CRUD
+        Role createRole(in Role role);
+        Role getRole(in RoleId id);
+        RoleList getAllRoles();
+        void updateRole(in Role role);
+        void deleteRole(in RoleId id);
+
+        // User-Role assignments
+        void assignRoleToUser(in UserId userId, in RoleId roleId);
+        void removeRoleFromUser(in UserId userId, in RoleId roleId);
+        RoleList getUserRoles(in UserId userId);
+        UserProfileList getUsersWithRole(in RoleId roleId);
+
+        // Permission checks
+        boolean hasPermission(in UserId userId, in string resource, in PermissionLevel level);
+        PermissionList getEffectivePermissions(in UserId userId);
+        PermissionLevel getPermissionLevel(in UserId userId, in string resource);
+    };
+
+    // Group management interface
+    interface GroupManager {
+        Group createGroup(in Group group);
+        Group getGroup(in GroupId id);
+        GroupList getAllGroups();
+        GroupList getChildGroups(in GroupId parentId);
+        GroupHierarchy getGroupHierarchy();  // Returns nested structure
+        void updateGroup(in Group group);
+        void deleteGroup(in GroupId id);
+
+        // Membership
+        void addUserToGroup(in UserId userId, in GroupId groupId);
+        void removeUserFromGroup(in UserId userId, in GroupId groupId);
+        UserProfileList getGroupMembers(in GroupId groupId);
+        GroupList getUserGroups(in UserId userId);
+    };
+
+    // Audit interface
+    interface AuditService {
+        void logAction(in AuditLogEntry entry);
+        AuditLog getAuditLog(in UserId userId, in DateTime from, in DateTime to);
+        AuditLog searchAuditLog(in string query, in unsigned long limit);
+    };
+
+};
+};
+
+#endif // USER_SERVICE_IDL

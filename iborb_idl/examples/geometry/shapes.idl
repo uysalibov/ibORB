@@ -1,0 +1,215 @@
+/**
+ * Geometry shapes and operations
+ */
+
+#ifndef GEOMETRY_SHAPES_IDL
+#define GEOMETRY_SHAPES_IDL
+
+#include "../common/types.idl"
+
+module Geometry {
+
+    // Forward declarations
+    interface Shape;
+    interface ShapeFactory;
+
+    // Use common types
+    typedef Common::Point2D Point;
+    typedef Common::Point2DList PointList;
+    typedef Common::Point2DListList PolygonWithHoles;  // Outer boundary + holes
+    typedef Common::Color Color;
+    typedef Common::Rectangle BoundingBox;
+    typedef Common::Matrix TransformMatrix;
+
+    // Shape types enum
+    enum ShapeType {
+        POINT,
+        LINE,
+        POLYLINE,
+        POLYGON,
+        CIRCLE,
+        ELLIPSE,
+        ARC,
+        BEZIER,
+        SPLINE,
+        COMPOUND
+    };
+
+    // Line segment
+    struct LineSegment {
+        Point start;
+        Point end;
+    };
+
+    typedef sequence<LineSegment> LineSegmentList;
+
+    // Circle
+    struct Circle {
+        Point center;
+        double radius;
+    };
+
+    // Ellipse
+    struct Ellipse {
+        Point center;
+        double radiusX;
+        double radiusY;
+        double rotation;  // radians
+    };
+
+    // Arc (part of ellipse)
+    struct Arc {
+        Ellipse ellipse;
+        double startAngle;
+        double endAngle;
+    };
+
+    // Bezier curve control points
+    struct BezierCurve {
+        Point start;
+        Point control1;
+        Point control2;
+        Point end;
+    };
+
+    typedef sequence<BezierCurve> BezierPath;
+
+    // Polygon with optional holes
+    struct Polygon {
+        PointList outerBoundary;
+        PolygonWithHoles holes;  // sequence<sequence<Point>> - nested!
+    };
+
+    typedef sequence<Polygon> PolygonList;
+    typedef sequence<PolygonList> MultiPolygon;  // Triple nesting!
+
+    // Style for rendering
+    struct ShapeStyle {
+        Color fillColor;
+        Color strokeColor;
+        double strokeWidth;
+        boolean filled;
+        double opacity;
+    };
+
+    // Transform operations
+    struct Transform {
+        TransformMatrix matrix;  // 3x3 matrix as sequence<sequence<double>>
+        Point origin;
+    };
+
+    // Shape data union - different data based on type
+    union ShapeData switch (ShapeType) {
+        case POINT:     Point point;
+        case LINE:      LineSegment line;
+        case POLYLINE:  PointList polyline;
+        case POLYGON:   Polygon polygon;
+        case CIRCLE:    Circle circle;
+        case ELLIPSE:   Ellipse ellipse;
+        case ARC:       Arc arc;
+        case BEZIER:    BezierPath bezier;
+        default:        sequence<octet> rawData;
+    };
+
+    // Complete shape with metadata
+    struct ShapeEntity {
+        Common::ObjectId id;
+        string name;
+        ShapeType type;
+        ShapeData data;
+        ShapeStyle style;
+        Transform transform;
+        Common::Properties attributes;
+        BoundingBox bounds;
+    };
+
+    typedef sequence<ShapeEntity> ShapeEntityList;
+
+    // Exceptions
+    exception InvalidShapeException {
+        Common::ErrorCode code;
+        string message;
+        ShapeType expectedType;
+        ShapeType actualType;
+    };
+
+    exception GeometryException {
+        Common::ErrorCode code;
+        string message;
+        Point location;
+    };
+
+    // Shape interface
+    interface Shape {
+        readonly attribute Common::ObjectId id;
+        readonly attribute ShapeType type;
+        attribute string name;
+        attribute ShapeStyle style;
+
+        BoundingBox getBounds();
+        double getArea();
+        double getPerimeter();
+        boolean containsPoint(in Point p);
+        
+        void applyTransform(in Transform t);
+        Shape clone();
+        
+        PointList getVertices();
+        ShapeData getData();
+    };
+
+    // Factory interface
+    interface ShapeFactory {
+        Shape createPoint(in Point p);
+        Shape createLine(in Point start, in Point end);
+        Shape createPolyline(in PointList points);
+        Shape createPolygon(in PointList points);
+        Shape createPolygonWithHoles(in PointList outer, in PolygonWithHoles holes);
+        Shape createCircle(in Point center, in double radius);
+        Shape createEllipse(in Point center, in double rx, in double ry);
+        
+        Shape createFromData(in ShapeData data)
+            raises (InvalidShapeException);
+        
+        ShapeEntityList batchCreate(in sequence<ShapeData> dataList);
+    };
+
+    // Geometry operations interface
+    interface GeometryOperations {
+        // Distance calculations
+        double distancePointToPoint(in Point p1, in Point p2);
+        double distancePointToLine(in Point p, in LineSegment line);
+        double distancePointToPolygon(in Point p, in Polygon poly);
+
+        // Intersection tests
+        boolean intersectsLineLine(in LineSegment l1, in LineSegment l2);
+        boolean intersectsLinePolygon(in LineSegment line, in Polygon poly);
+        boolean intersectsPolygonPolygon(in Polygon p1, in Polygon p2);
+        
+        // Intersection points
+        PointList getIntersectionPoints(in Shape s1, in Shape s2);
+
+        // Boolean operations
+        PolygonList unionPolygons(in Polygon p1, in Polygon p2);
+        PolygonList intersectPolygons(in Polygon p1, in Polygon p2);
+        PolygonList subtractPolygons(in Polygon p1, in Polygon p2);
+
+        // Transformations
+        Point transformPoint(in Point p, in TransformMatrix matrix);
+        PointList transformPoints(in PointList points, in TransformMatrix matrix);
+        Polygon transformPolygon(in Polygon poly, in TransformMatrix matrix);
+
+        // Utilities
+        Point getCentroid(in PointList points);
+        BoundingBox computeBoundingBox(in PointList points);
+        PointList convexHull(in PointList points);
+        PointList simplifyPolyline(in PointList points, in double tolerance);
+        
+        // Triangulation
+        sequence<Polygon> triangulate(in Polygon poly)
+            raises (GeometryException);
+    };
+
+};
+
+#endif // GEOMETRY_SHAPES_IDL

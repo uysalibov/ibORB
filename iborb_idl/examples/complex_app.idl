@@ -1,0 +1,516 @@
+/**
+ * Complex application combining all services
+ * Demonstrates deep nesting, cross-module references, and advanced patterns
+ */
+
+#ifndef COMPLEX_APP_IDL
+#define COMPLEX_APP_IDL
+
+#include "common/types.idl"
+#include "common/collections.idl"
+#include "services/user_service.idl"
+#include "services/event_service.idl"
+#include "geometry/shapes.idl"
+
+module Application {
+
+    // Import commonly used types
+    typedef Common::ObjectId Id;
+    typedef Common::DateTime DateTime;
+    typedef Common::Properties Metadata;
+    typedef Common::Result Result;
+    typedef Common::Point2D Location;
+
+    // Deeply nested typedef chains
+    typedef Geometry::Point Point;
+    typedef Geometry::PointList PointList;
+    typedef Geometry::PolygonWithHoles PolygonWithHoles;
+    typedef Geometry::MultiPolygon MultiPolygon;           // sequence<sequence<Polygon>>
+    typedef sequence<MultiPolygon> MultiPolygonCollection; // 4 levels deep!
+
+    // Matrix operations
+    typedef Common::Matrix Matrix;
+    typedef sequence<Matrix> MatrixList;
+    typedef sequence<MatrixList> TensorSlice;  // 4D tensor slice
+    typedef sequence<TensorSlice> Tensor4D;    // Full 4D tensor (5 levels of sequence nesting!)
+
+    // User service types
+    typedef Services::User::User User;
+    typedef Services::User::UserProfile UserProfile;
+    typedef Services::User::UserList UserList;
+    typedef Services::User::GroupHierarchy GroupHierarchy;
+
+    // Event service types
+    typedef Services::Events::Event Event;
+    typedef Services::Events::EventList EventList;
+    typedef Services::Events::EventBatch EventBatch;
+    typedef Services::Events::ChannelMetrics ChannelMetrics;
+
+    // Application-specific enums
+    enum EntityType {
+        PROJECT,
+        DOCUMENT,
+        TASK,
+        COMMENT,
+        ATTACHMENT,
+        MILESTONE,
+        LABEL
+    };
+
+    enum Permission {
+        VIEW,
+        EDIT,
+        DELETE,
+        SHARE,
+        ADMIN
+    };
+
+    enum NotificationType {
+        MENTION,
+        ASSIGNMENT,
+        STATUS_CHANGE,
+        DEADLINE,
+        COMMENT,
+        SYSTEM
+    };
+
+    // Label for categorization
+    struct Label {
+        Id id;
+        string name;
+        Common::Color color;
+        string description;
+    };
+
+    typedef sequence<Label> LabelList;
+    typedef sequence<Id> LabelIdList;
+
+    // Comment with threading
+    struct Comment {
+        Id id;
+        Id authorId;
+        Id parentCommentId;  // For threading
+        string content;
+        DateTime createdAt;
+        DateTime updatedAt;
+        sequence<Id> mentionedUserIds;
+        LabelIdList labels;
+        Metadata attachments;
+    };
+
+    typedef sequence<Comment> CommentList;
+    typedef sequence<CommentList> ThreadedComments;  // Comments grouped by thread
+
+    // Attachment
+    struct Attachment {
+        Id id;
+        string filename;
+        string mimeType;
+        unsigned long long sizeBytes;
+        string storageUrl;
+        DateTime uploadedAt;
+        Id uploadedBy;
+        Common::BinaryData thumbnail;
+        Metadata metadata;
+    };
+
+    typedef sequence<Attachment> AttachmentList;
+
+    // Task with subtasks (recursive structure via IDs)
+    struct Task {
+        Id id;
+        Id projectId;
+        string title;
+        string description;
+        Id assigneeId;
+        sequence<Id> watcherIds;
+        Id parentTaskId;
+        sequence<Id> subtaskIds;
+        sequence<Id> dependencyIds;
+        LabelIdList labels;
+        DateTime dueDate;
+        DateTime startDate;
+        DateTime completedAt;
+        unsigned short progress;  // 0-100
+        string status;
+        string priority;
+        AttachmentList attachments;
+        CommentList comments;
+        Metadata customFields;
+        DateTime createdAt;
+        DateTime updatedAt;
+    };
+
+    typedef sequence<Task> TaskList;
+    typedef sequence<TaskList> TaskGroups;  // Tasks grouped by status/assignee/etc.
+    typedef sequence<TaskGroups> TaskMatrix; // 2D grouping (e.g., by status AND priority)
+
+    // Milestone
+    struct Milestone {
+        Id id;
+        Id projectId;
+        string name;
+        string description;
+        DateTime dueDate;
+        DateTime completedAt;
+        sequence<Id> taskIds;
+        unsigned short progress;
+    };
+
+    typedef sequence<Milestone> MilestoneList;
+
+    // Document with version history
+    struct DocumentVersion {
+        unsigned long versionNumber;
+        Id authorId;
+        DateTime createdAt;
+        string changeDescription;
+        Common::BinaryData content;
+        string contentHash;
+    };
+
+    typedef sequence<DocumentVersion> VersionHistory;
+
+    struct Document {
+        Id id;
+        Id projectId;
+        string title;
+        string mimeType;
+        DocumentVersion currentVersion;
+        VersionHistory history;
+        LabelIdList labels;
+        CommentList comments;
+        Metadata metadata;
+        DateTime createdAt;
+        DateTime updatedAt;
+    };
+
+    typedef sequence<Document> DocumentList;
+    typedef sequence<DocumentList> DocumentsByCategory;  // Documents grouped
+
+    // Project with all components
+    struct Project {
+        Id id;
+        string name;
+        string description;
+        Id ownerId;
+        sequence<Id> memberIds;
+        GroupHierarchy teamStructure;  // From user service - nested groups
+        Location headquarters;
+        MultiPolygon geoBoundaries;    // Project coverage area - deeply nested
+        
+        // Project contents
+        TaskList tasks;
+        TaskMatrix taskBoard;          // Tasks organized in 2D grid
+        MilestoneList milestones;
+        DocumentsByCategory documents;
+        LabelList availableLabels;
+        
+        // Settings
+        Metadata settings;
+        ChannelMetrics activityMetrics; // From event service - deeply nested
+        
+        // Timestamps
+        DateTime createdAt;
+        DateTime updatedAt;
+        DateTime archivedAt;
+    };
+
+    typedef sequence<Project> ProjectList;
+
+    // Workspace containing multiple projects
+    struct Workspace {
+        Id id;
+        string name;
+        Id organizationId;
+        ProjectList projects;
+        UserList members;
+        GroupHierarchy accessControl;
+        Tensor4D analyticsData;  // 5 levels deep!
+        Metadata settings;
+    };
+
+    typedef sequence<Workspace> WorkspaceList;
+
+    // Activity feed item
+    struct ActivityItem {
+        Id id;
+        EntityType entityType;
+        Id entityId;
+        string action;
+        Id actorId;
+        DateTime timestamp;
+        Metadata details;
+        Metadata changes;  // Before/after values
+    };
+
+    typedef sequence<ActivityItem> ActivityFeed;
+    typedef sequence<ActivityFeed> ActivityByDay;
+    typedef sequence<ActivityByDay> ActivityByWeek;
+
+    // Notification
+    struct Notification {
+        Id id;
+        Id recipientId;
+        NotificationType type;
+        EntityType entityType;
+        Id entityId;
+        string title;
+        string message;
+        DateTime createdAt;
+        DateTime readAt;
+        Metadata data;
+    };
+
+    typedef sequence<Notification> NotificationList;
+    typedef sequence<NotificationList> NotificationsByType;
+
+    // Search result
+    struct SearchHit {
+        EntityType entityType;
+        Id entityId;
+        string title;
+        string snippet;
+        double score;
+        Metadata highlights;
+    };
+
+    typedef sequence<SearchHit> SearchHitList;
+
+    struct SearchResults {
+        SearchHitList hits;
+        unsigned long totalHits;
+        Metadata facets;
+        Metadata suggestions;
+    };
+
+    // Analytics
+    struct MetricValue {
+        string name;
+        double value;
+        DateTime timestamp;
+        Metadata dimensions;
+    };
+
+    typedef sequence<MetricValue> MetricSeries;
+    typedef sequence<MetricSeries> MetricsByDimension;
+    typedef sequence<MetricsByDimension> AnalyticsCube;  // Multi-dimensional analytics
+
+    // Dashboard widget data
+    union WidgetData switch (short) {
+        case 0: MetricSeries timeSeries;
+        case 1: AnalyticsCube cube;
+        case 2: TaskMatrix taskBoard;
+        case 3: ActivityByWeek activity;
+        case 4: SearchResults search;
+        default: Metadata rawData;
+    };
+
+    struct DashboardWidget {
+        Id id;
+        string title;
+        string type;
+        short dataType;
+        WidgetData data;
+        Metadata config;
+    };
+
+    typedef sequence<DashboardWidget> Dashboard;
+    typedef sequence<Dashboard> DashboardList;
+
+    // Exceptions
+    exception ProjectNotFoundException {
+        Common::ErrorCode code;
+        string message;
+        Id projectId;
+    };
+
+    exception TaskNotFoundException {
+        Common::ErrorCode code;
+        string message;
+        Id taskId;
+    };
+
+    exception DocumentNotFoundException {
+        Common::ErrorCode code;
+        string message;
+        Id documentId;
+    };
+
+    exception CircularDependencyException {
+        Common::ErrorCode code;
+        string message;
+        sequence<Id> cycle;
+    };
+
+    // Main application interface
+    interface ProjectManager {
+        // Project CRUD
+        Project createProject(in Project project)
+            raises (Services::User::AuthorizationException);
+        
+        Project getProject(in Id projectId)
+            raises (ProjectNotFoundException);
+        
+        ProjectList getProjects(in sequence<Id> projectIds);
+        ProjectList listUserProjects(in Id userId);
+        
+        void updateProject(in Project project)
+            raises (ProjectNotFoundException, Services::User::AuthorizationException);
+        
+        void archiveProject(in Id projectId)
+            raises (ProjectNotFoundException);
+        
+        void deleteProject(in Id projectId)
+            raises (ProjectNotFoundException, Services::User::AuthorizationException);
+
+        // Members
+        void addProjectMember(in Id projectId, in Id userId, in Permission permission)
+            raises (ProjectNotFoundException, Services::User::UserNotFoundException);
+        
+        void removeProjectMember(in Id projectId, in Id userId)
+            raises (ProjectNotFoundException);
+        
+        UserList getProjectMembers(in Id projectId)
+            raises (ProjectNotFoundException);
+
+        // Geo boundaries (deeply nested)
+        void setProjectBoundaries(in Id projectId, in MultiPolygon boundaries)
+            raises (ProjectNotFoundException);
+        
+        MultiPolygon getProjectBoundaries(in Id projectId)
+            raises (ProjectNotFoundException);
+    };
+
+    interface TaskManager {
+        // Task CRUD
+        Task createTask(in Task task)
+            raises (ProjectNotFoundException);
+        
+        Task getTask(in Id taskId)
+            raises (TaskNotFoundException);
+        
+        TaskList getTasks(in Id projectId)
+            raises (ProjectNotFoundException);
+        
+        TaskMatrix getTaskBoard(in Id projectId)
+            raises (ProjectNotFoundException);
+        
+        void updateTask(in Task task)
+            raises (TaskNotFoundException);
+        
+        void deleteTask(in Id taskId)
+            raises (TaskNotFoundException);
+
+        // Dependencies
+        void addDependency(in Id taskId, in Id dependsOnTaskId)
+            raises (TaskNotFoundException, CircularDependencyException);
+        
+        void removeDependency(in Id taskId, in Id dependsOnTaskId)
+            raises (TaskNotFoundException);
+        
+        TaskList getDependencies(in Id taskId)
+            raises (TaskNotFoundException);
+        
+        TaskList getDependents(in Id taskId)
+            raises (TaskNotFoundException);
+
+        // Subtasks
+        Task createSubtask(in Id parentTaskId, in Task subtask)
+            raises (TaskNotFoundException);
+        
+        TaskList getSubtasks(in Id taskId)
+            raises (TaskNotFoundException);
+
+        // Bulk operations
+        void updateTasks(in TaskList tasks);
+        void moveTasks(in sequence<Id> taskIds, in Id targetProjectId)
+            raises (ProjectNotFoundException);
+    };
+
+    interface DocumentManager {
+        Document createDocument(in Document doc)
+            raises (ProjectNotFoundException);
+        
+        Document getDocument(in Id documentId)
+            raises (DocumentNotFoundException);
+        
+        DocumentsByCategory getProjectDocuments(in Id projectId)
+            raises (ProjectNotFoundException);
+        
+        void updateDocument(in Document doc)
+            raises (DocumentNotFoundException);
+        
+        void deleteDocument(in Id documentId)
+            raises (DocumentNotFoundException);
+
+        // Versioning
+        DocumentVersion createVersion(in Id documentId, in DocumentVersion version)
+            raises (DocumentNotFoundException);
+        
+        VersionHistory getVersionHistory(in Id documentId)
+            raises (DocumentNotFoundException);
+        
+        DocumentVersion getVersion(in Id documentId, in unsigned long versionNumber)
+            raises (DocumentNotFoundException);
+        
+        void revertToVersion(in Id documentId, in unsigned long versionNumber)
+            raises (DocumentNotFoundException);
+    };
+
+    interface ActivityService {
+        void logActivity(in ActivityItem activity);
+        
+        ActivityFeed getActivityFeed(in Id projectId, in unsigned long limit);
+        ActivityByDay getDailyActivity(in Id projectId, in DateTime from, in DateTime to);
+        ActivityByWeek getWeeklyActivity(in Id projectId, in DateTime from, in DateTime to);
+        
+        ActivityFeed getUserActivity(in Id userId, in unsigned long limit);
+    };
+
+    interface NotificationService {
+        NotificationList getNotifications(in Id userId);
+        NotificationsByType getNotificationsByType(in Id userId);
+        
+        void markAsRead(in Id notificationId);
+        void markAllAsRead(in Id userId);
+        
+        unsigned long getUnreadCount(in Id userId);
+    };
+
+    interface SearchService {
+        SearchResults search(in string query, in Id projectId);
+        SearchResults globalSearch(in string query);
+        
+        SearchResults searchTasks(in string query, in Id projectId, in Metadata filters);
+        SearchResults searchDocuments(in string query, in Id projectId, in Metadata filters);
+    };
+
+    interface AnalyticsService {
+        AnalyticsCube getProjectAnalytics(in Id projectId, in DateTime from, in DateTime to);
+        Tensor4D getAdvancedAnalytics(in Id projectId, in sequence<string> dimensions);
+        
+        Dashboard getDefaultDashboard(in Id projectId);
+        DashboardList getUserDashboards(in Id userId);
+        
+        void saveDashboard(in Dashboard dashboard);
+    };
+
+    // Main application facade
+    interface Application {
+        readonly attribute ProjectManager projects;
+        readonly attribute TaskManager tasks;
+        readonly attribute DocumentManager documents;
+        readonly attribute ActivityService activity;
+        readonly attribute NotificationService notifications;
+        readonly attribute SearchService search;
+        readonly attribute AnalyticsService analytics;
+        
+        readonly attribute Services::User::UserManager users;
+        readonly attribute Services::User::AuthService auth;
+        readonly attribute Services::Events::EventPublisher events;
+    };
+
+};
+
+#endif // COMPLEX_APP_IDL

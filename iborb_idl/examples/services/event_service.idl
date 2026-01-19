@@ -1,0 +1,353 @@
+/**
+ * Event-driven messaging service with complex callback patterns
+ */
+
+#ifndef EVENT_SERVICE_IDL
+#define EVENT_SERVICE_IDL
+
+#include "../common/types.idl"
+
+module Services {
+module Events {
+
+    // Type aliases
+    typedef Common::ObjectId EventId;
+    typedef Common::ObjectId SubscriptionId;
+    typedef Common::ObjectId ChannelId;
+    typedef Common::DateTime DateTime;
+    typedef Common::Properties Headers;
+    typedef Common::BinaryData Payload;
+
+    // Event priority
+    enum Priority {
+        LOW,
+        NORMAL,
+        HIGH,
+        CRITICAL
+    };
+
+    // Delivery guarantee
+    enum DeliveryMode {
+        AT_MOST_ONCE,   // Fire and forget
+        AT_LEAST_ONCE,  // With acknowledgment
+        EXACTLY_ONCE    // Transactional
+    };
+
+    // Event status
+    enum EventStatus {
+        PENDING,
+        DELIVERED,
+        ACKNOWLEDGED,
+        FAILED,
+        EXPIRED,
+        RETRYING
+    };
+
+    // Subscription type
+    enum SubscriptionType {
+        PUSH,      // Server pushes to client
+        PULL,      // Client polls
+        CALLBACK   // Server calls client interface
+    };
+
+    // Filter operator
+    enum FilterOperator {
+        EQUALS,
+        NOT_EQUALS,
+        CONTAINS,
+        STARTS_WITH,
+        ENDS_WITH,
+        GREATER_THAN,
+        LESS_THAN,
+        IN_LIST,
+        REGEX
+    };
+
+    // Single filter condition
+    struct FilterCondition {
+        string field;
+        FilterOperator op;
+        string value;
+    };
+
+    typedef sequence<FilterCondition> FilterConditions;
+
+    // Compound filter with AND/OR logic
+    struct EventFilter {
+        sequence<string> eventTypes;
+        FilterConditions conditions;
+        boolean matchAll;  // true = AND, false = OR
+        sequence<EventFilter> nestedFilters;  // Recursive nesting!
+    };
+
+    typedef sequence<EventFilter> FilterList;
+
+    // Event envelope
+    struct Event {
+        EventId id;
+        string eventType;
+        string source;
+        DateTime timestamp;
+        DateTime expiresAt;
+        Priority priority;
+        Headers headers;
+        Payload payload;
+        string correlationId;
+        string causationId;
+        unsigned long sequenceNumber;
+        string partitionKey;
+    };
+
+    typedef sequence<Event> EventList;
+    typedef sequence<EventList> EventBatch;  // Batches of event lists
+
+    // Delivery attempt record
+    struct DeliveryAttempt {
+        DateTime attemptedAt;
+        boolean successful;
+        string errorMessage;
+        unsigned long responseTimeMs;
+    };
+
+    typedef sequence<DeliveryAttempt> DeliveryHistory;
+
+    // Event with delivery status
+    struct TrackedEvent {
+        Event event;
+        EventStatus status;
+        DeliveryHistory deliveryAttempts;
+        unsigned long retryCount;
+        DateTime nextRetryAt;
+    };
+
+    typedef sequence<TrackedEvent> TrackedEventList;
+
+    // Channel (topic/queue)
+    struct Channel {
+        ChannelId id;
+        string name;
+        string description;
+        DeliveryMode deliveryMode;
+        unsigned long maxRetries;
+        unsigned long retryDelayMs;
+        unsigned long messageRetentionHours;
+        boolean durable;
+        Headers defaultHeaders;
+    };
+
+    typedef sequence<Channel> ChannelList;
+
+    // Subscription configuration
+    struct SubscriptionConfig {
+        SubscriptionId id;
+        ChannelId channelId;
+        string subscriberName;
+        SubscriptionType type;
+        EventFilter filter;
+        unsigned long batchSize;
+        unsigned long batchTimeoutMs;
+        string callbackUrl;      // For webhook-style callbacks
+        DeliveryMode deliveryMode;
+        boolean active;
+        DateTime createdAt;
+        Headers customHeaders;
+    };
+
+    typedef sequence<SubscriptionConfig> SubscriptionList;
+
+    // Statistics
+    struct ChannelStats {
+        ChannelId channelId;
+        unsigned long long totalPublished;
+        unsigned long long totalDelivered;
+        unsigned long long totalFailed;
+        unsigned long pendingCount;
+        double avgDeliveryTimeMs;
+        DateTime lastPublishedAt;
+        DateTime lastDeliveredAt;
+    };
+
+    struct SubscriptionStats {
+        SubscriptionId subscriptionId;
+        unsigned long long totalReceived;
+        unsigned long long totalAcknowledged;
+        unsigned long long totalFailed;
+        unsigned long pendingCount;
+        double avgProcessingTimeMs;
+        DateTime lastReceivedAt;
+    };
+
+    typedef sequence<ChannelStats> ChannelStatsList;
+    typedef sequence<SubscriptionStats> SubscriptionStatsList;
+
+    // Aggregate stats by time period
+    struct TimeSeriesPoint {
+        DateTime timestamp;
+        unsigned long long count;
+        double avgValue;
+    };
+
+    typedef sequence<TimeSeriesPoint> TimeSeries;
+    
+    // Multi-dimensional stats: channel -> metric -> time series
+    typedef sequence<TimeSeries> MetricSeries;
+    typedef sequence<MetricSeries> ChannelMetrics;
+
+    // Exceptions
+    exception ChannelNotFoundException {
+        Common::ErrorCode code;
+        string message;
+        ChannelId channelId;
+    };
+
+    exception SubscriptionNotFoundException {
+        Common::ErrorCode code;
+        string message;
+        SubscriptionId subscriptionId;
+    };
+
+    exception PublishException {
+        Common::ErrorCode code;
+        string message;
+        EventId eventId;
+        string reason;
+    };
+
+    exception FilterException {
+        Common::ErrorCode code;
+        string message;
+        string filterExpression;
+        string parseError;
+    };
+
+    // Callback interface - client implements this
+    interface EventCallback {
+        // Called when events are ready
+        void onEvent(in Event event);
+        void onEventBatch(in EventList events);
+        
+        // Error handling
+        void onError(in string errorMessage, in Event failedEvent);
+        
+        // Connection management
+        void onConnected(in ChannelId channelId);
+        void onDisconnected(in ChannelId channelId, in string reason);
+    };
+
+    // Publisher interface
+    interface EventPublisher {
+        // Single event publishing
+        EventId publish(in ChannelId channelId, in Event event)
+            raises (ChannelNotFoundException, PublishException);
+        
+        // Batch publishing
+        sequence<EventId> publishBatch(in ChannelId channelId, in EventList events)
+            raises (ChannelNotFoundException, PublishException);
+        
+        // Publish with confirmation
+        boolean publishAndWait(in ChannelId channelId, in Event event, in unsigned long timeoutMs)
+            raises (ChannelNotFoundException, PublishException);
+        
+        // Scheduled publishing
+        EventId scheduleEvent(in ChannelId channelId, in Event event, in DateTime deliverAt)
+            raises (ChannelNotFoundException);
+        
+        void cancelScheduledEvent(in EventId eventId);
+
+        // Transaction support
+        string beginTransaction();
+        void commitTransaction(in string transactionId);
+        void rollbackTransaction(in string transactionId);
+    };
+
+    // Subscriber interface
+    interface EventSubscriber {
+        // Subscription management
+        SubscriptionConfig subscribe(in ChannelId channelId, in SubscriptionConfig config)
+            raises (ChannelNotFoundException, FilterException);
+        
+        void unsubscribe(in SubscriptionId subscriptionId)
+            raises (SubscriptionNotFoundException);
+        
+        void updateSubscription(in SubscriptionConfig config)
+            raises (SubscriptionNotFoundException, FilterException);
+        
+        SubscriptionConfig getSubscription(in SubscriptionId subscriptionId)
+            raises (SubscriptionNotFoundException);
+        
+        SubscriptionList listSubscriptions(in ChannelId channelId);
+
+        // Pull-based consumption
+        EventList poll(in SubscriptionId subscriptionId, in unsigned long maxEvents, in unsigned long timeoutMs)
+            raises (SubscriptionNotFoundException);
+        
+        // Acknowledgment
+        void acknowledge(in SubscriptionId subscriptionId, in EventId eventId)
+            raises (SubscriptionNotFoundException);
+        
+        void acknowledgeBatch(in SubscriptionId subscriptionId, in sequence<EventId> eventIds)
+            raises (SubscriptionNotFoundException);
+        
+        void reject(in SubscriptionId subscriptionId, in EventId eventId, in boolean requeue)
+            raises (SubscriptionNotFoundException);
+
+        // Push-based with callback
+        void registerCallback(in SubscriptionId subscriptionId, in EventCallback callback)
+            raises (SubscriptionNotFoundException);
+        
+        void unregisterCallback(in SubscriptionId subscriptionId);
+
+        // Seek/replay
+        void seekToTimestamp(in SubscriptionId subscriptionId, in DateTime timestamp)
+            raises (SubscriptionNotFoundException);
+        
+        void seekToSequence(in SubscriptionId subscriptionId, in unsigned long sequenceNumber)
+            raises (SubscriptionNotFoundException);
+    };
+
+    // Channel management interface
+    interface ChannelManager {
+        Channel createChannel(in Channel channel);
+        Channel getChannel(in ChannelId channelId)
+            raises (ChannelNotFoundException);
+        ChannelList listChannels();
+        void updateChannel(in Channel channel)
+            raises (ChannelNotFoundException);
+        void deleteChannel(in ChannelId channelId)
+            raises (ChannelNotFoundException);
+        
+        // Purge messages
+        void purgeChannel(in ChannelId channelId)
+            raises (ChannelNotFoundException);
+    };
+
+    // Monitoring interface
+    interface EventMonitor {
+        // Real-time stats
+        ChannelStats getChannelStats(in ChannelId channelId)
+            raises (ChannelNotFoundException);
+        ChannelStatsList getAllChannelStats();
+        
+        SubscriptionStats getSubscriptionStats(in SubscriptionId subscriptionId)
+            raises (SubscriptionNotFoundException);
+        SubscriptionStatsList getSubscriptionStatsForChannel(in ChannelId channelId);
+
+        // Historical data
+        TimeSeries getPublishRate(in ChannelId channelId, in DateTime from, in DateTime to);
+        TimeSeries getDeliveryRate(in SubscriptionId subscriptionId, in DateTime from, in DateTime to);
+        ChannelMetrics getChannelMetrics(in ChannelId channelId, in DateTime from, in DateTime to);
+
+        // Dead letter queue
+        TrackedEventList getDeadLetterEvents(in ChannelId channelId, in unsigned long limit);
+        void replayDeadLetterEvent(in EventId eventId);
+        void purgeDeadLetterQueue(in ChannelId channelId);
+
+        // Event tracking
+        TrackedEvent trackEvent(in EventId eventId);
+        TrackedEventList searchEvents(in EventFilter filter, in unsigned long limit);
+    };
+
+};
+};
+
+#endif // EVENT_SERVICE_IDL

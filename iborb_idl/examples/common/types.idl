@@ -1,0 +1,102 @@
+/**
+ * Common base types used across the system
+ * This file is included by other IDL files
+ */
+
+#ifndef COMMON_TYPES_IDL
+#define COMMON_TYPES_IDL
+
+module Common {
+
+    // Basic type aliases
+    typedef long ObjectId;
+    typedef unsigned long long Timestamp;
+    typedef string<256> ShortString;
+    typedef string<4096> LongString;
+    typedef sequence<octet> BinaryData;
+    
+    // Status codes
+    enum ErrorCode {
+        SUCCESS,
+        NOT_FOUND,
+        PERMISSION_DENIED,
+        INVALID_ARGUMENT,
+        TIMEOUT,
+        INTERNAL_ERROR
+    };
+
+    // Generic result wrapper
+    struct Result {
+        ErrorCode code;
+        string message;
+    };
+
+    // 2D Point
+    struct Point2D {
+        double x;
+        double y;
+    };
+
+    // 3D Point
+    struct Point3D {
+        double x;
+        double y;
+        double z;
+    };
+
+    // Rectangle
+    struct Rectangle {
+        Point2D topLeft;
+        Point2D bottomRight;
+    };
+
+    // Color (RGBA)
+    struct Color {
+        octet r;
+        octet g;
+        octet b;
+        octet a;
+    };
+
+    // Date/Time
+    struct DateTime {
+        short year;
+        octet month;
+        octet day;
+        octet hour;
+        octet minute;
+        octet second;
+        unsigned long milliseconds;
+    };
+
+    // UUID as fixed-size array
+    typedef octet UUID[16];
+
+    // Key-value pair
+    struct KeyValue {
+        string key;
+        string value;
+    };
+
+    typedef sequence<KeyValue> Properties;
+
+    // Nested sequences - PointList and PointListList
+    typedef sequence<Point2D> Point2DList;
+    typedef sequence<Point3D> Point3DList;
+    typedef sequence<Point2DList> Point2DListList;  // List of point lists (e.g., for polygons with holes)
+    typedef sequence<Point3DList> Point3DListList;  // 3D version
+    
+    // Matrix as nested sequence
+    typedef sequence<double> DoubleRow;
+    typedef sequence<DoubleRow> Matrix;
+
+    // Generic exceptions
+    exception BaseException {
+        ErrorCode code;
+        string message;
+        Timestamp timestamp;
+    };
+
+};
+
+#endif // COMMON_TYPES_IDL

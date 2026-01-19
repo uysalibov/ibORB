@@ -1,0 +1,78 @@
+/**
+ * Collection types and utilities
+ */
+
+#ifndef COMMON_COLLECTIONS_IDL
+#define COMMON_COLLECTIONS_IDL
+
+#include "types.idl"
+
+module Common {
+module Collections {
+
+    // Bounded sequences
+    typedef sequence<long, 100> BoundedIntList;
+    typedef sequence<string, 50> BoundedStringList;
+    typedef sequence<Point2D, 1000> BoundedPoint2DList;
+
+    // Stack-like structure
+    struct Stack {
+        sequence<any> items;
+        unsigned long maxSize;
+    };
+
+    // Queue-like structure  
+    struct Queue {
+        sequence<any> items;
+        unsigned long head;
+        unsigned long tail;
+    };
+
+    // Pagination info
+    struct PageInfo {
+        unsigned long pageNumber;
+        unsigned long pageSize;
+        unsigned long totalItems;
+        unsigned long totalPages;
+    };
+
+    // Paginated result wrapper - generic pattern
+    struct PaginatedResult {
+        PageInfo pagination;
+        sequence<any> items;
+    };
+
+    // Tree node (recursive through sequence)
+    struct TreeNode {
+        ObjectId id;
+        string name;
+        any data;
+        sequence<ObjectId> childIds;  // References to children
+    };
+
+    typedef sequence<TreeNode> TreeNodeList;
+
+    // Graph edge
+    struct Edge {
+        ObjectId sourceId;
+        ObjectId targetId;
+        double weight;
+        Properties metadata;
+    };
+
+    typedef sequence<Edge> EdgeList;
+    typedef sequence<EdgeList> AdjacencyList;  // Nested: list of edge lists per node
+
+    // Sparse matrix entry
+    struct SparseMatrixEntry {
+        unsigned long row;
+        unsigned long col;
+        double value;
+    };
+
+    typedef sequence<SparseMatrixEntry> SparseMatrix;
+
+};
+};
+
+#endif // COMMON_COLLECTIONS_IDL
