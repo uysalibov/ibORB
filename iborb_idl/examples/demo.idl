@@ -1,0 +1,93 @@
+/**
+ * Demo IDL file for testing iborb_idl compiler
+ */
+
+module Demo {
+    
+    // Constants
+    const long MAX_USERS = 1000;
+    const string VERSION = "1.0.0";
+
+    // Enumeration
+    enum Status {
+        ACTIVE,
+        INACTIVE,
+        PENDING
+    };
+
+    // Simple struct
+    struct UserData {
+        long id;
+        string name;
+        Status status;
+    };
+
+    // Typedef for sequences
+    typedef sequence<UserData> UserList;
+    typedef sequence<long> IdList;
+
+    // Nested module
+    module Math {
+        struct Point {
+            double x;
+            double y;
+        };
+
+        typedef sequence<Point> PointList;
+    };
+
+    // Exception
+    exception UserNotFoundException {
+        long userId;
+        string message;
+    };
+
+    exception InvalidOperationException {
+        string reason;
+    };
+
+    // Main interface
+    interface Calculator {
+        // Simple operations
+        long add(in long a, in long b);
+        long subtract(in long a, in long b);
+        double divide(in double a, in double b) 
+            raises (InvalidOperationException);
+        
+        // Operations with structs
+        void processUser(in UserData data);
+        UserData getUser(in long userId) 
+            raises (UserNotFoundException);
+        
+        // Sequences
+        UserList getAllUsers();
+        void updateUsers(in UserList users);
+        
+        // Attributes
+        readonly attribute string version;
+        attribute long maxConnections;
+    };
+
+    // Interface with inheritance
+    interface AdvancedCalculator : Calculator {
+        double power(in double base, in double exponent);
+        double squareRoot(in double value)
+            raises (InvalidOperationException);
+        
+        // Using nested module type
+        Math::Point calculateMidpoint(in Math::Point p1, in Math::Point p2);
+    };
+
+    // Abstract interface
+    abstract interface Serializable {
+        string serialize();
+        void deserialize(in string data);
+    };
+
+    // Local interface (not remotable)
+    local interface Logger {
+        void log(in string message);
+        void setLevel(in long level);
+    };
+
+};
